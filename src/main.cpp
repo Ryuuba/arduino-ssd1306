@@ -4,8 +4,21 @@
 #include <Adafruit_SSD1306.h>
 #include "SSD1306_Defs.h"
 
+#define BASE_DELAY 1000
+
+void changeMode();
+void changeSpeed();
+
+namespace global {
+  unsigned int counter = 0;
+  bool mode = false;
+  uint8_t speed = 0;
+  unsigned int delay = 1000;
+  unsigned int pines[5] = {PB5, PB6, PB7, PB8, PB9};
+  bool led_status = false;
+}
+
 void blink(unsigned);
-void SystemClock_Config();
 
 namespace global {
     Adafruit_SSD1306* oled;
@@ -14,28 +27,34 @@ namespace global {
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  SystemClock_Config();
-  global::oled = new Adafruit_SSD1306(
-    OLED_WIDTH, 
-    OLED_HEIGHT, 
-    &Wire, 
-    -1
-  );
-  if(!global::oled->begin(SSD1306_SWITCHCAPVCC, false)) {
-    blink(1000);
+  pinMode(PA5, INPUT);
+  pinMode(PA6, INPUT);
+  attachInterrupt(PA5, changeMode, RISING);
+  attachInterrupt(PA6, changeSpeed, RISING);
+  Wire.begin(SDA, SCL);
+  global::oled = new Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT);
+  if(!global::oled->begin(SSD1306_SWITCHCAPVCC, 60)) {
+    blink(100);
   }
+  global::oled->setTextColor(SSD1306_WHITE);
 }
 
 void loop() {
   global::oled->clearDisplay();
-  global::oled->setTextSize(2);
-  global::oled->setTextColor(SSD1306_WHITE);
   global::oled->setCursor(0, 0);
-  global::oled->printf("Hello world\n");
+  global::oled->setTextSize(3);
+  global::oled->print("uC 23i\n");
+  global::oled->setTextSize(2);
+  global::oled->print("counter\n");
+  // global::oled->setCursor(0, 40);
+  global::oled->printf("%d", global::counter);
   global::oled->display();
-  blink(100);
+  delay(global::delay);
+  global::counter = (!global::mode) 
+                  ? global::counter + 1 
+                  : global::counter - 1;
+  global::delay = (global::speed <= 4) ? BASE_DELAY >> global::speed : 1000;
 }
-
 
 void blink(unsigned ms) {
   while (true) {
@@ -45,37 +64,10 @@ void blink(unsigned ms) {
   }
 }
 
+void changeMode() {
+  global::mode = !global::mode;
+}
 
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
+void changeSpeed() {
+  global::speed = (global::speed <= 4) ? global::speed+1 : 1;
 }
